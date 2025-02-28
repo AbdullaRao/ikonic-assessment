@@ -156,3 +156,63 @@ if ( ! function_exists( 'twentytwentyfive_format_binding' ) ) :
 		}
 	}
 endif;
+
+function hs_fix_projects_pagination($query) {
+    if (!is_admin() && $query->is_main_query() && !is_singular() && is_post_type_archive('projects')) {
+        $query->set('posts_per_page', 6); // ✅ Ensures pagination limit works
+        $query->set('paged', max(1, get_query_var('paged', 1))); // ✅ Fixes /projects/page/2/
+    }
+}
+add_action('pre_get_posts', 'hs_fix_projects_pagination');
+// Registers custom block patterns.
+function hs_enqueue_block_styles() {
+    wp_enqueue_style('wp-block-library'); // Loads core block styles
+    wp_enqueue_style('twentytwentyfive-style', get_template_directory_uri() . '/style.css', [], wp_get_theme()->get('Version')); // Loads the main theme stylesheet
+}
+add_action('wp_enqueue_scripts', 'hs_enqueue_block_styles');
+
+
+function hs_get_coffee_and_quotes() {
+    // Fetch Coffee Image
+    $coffee_response = wp_remote_get('https://coffee.alexflipnote.dev/random.json');
+    $coffee_url = '';
+    
+    if (!is_wp_error($coffee_response)) {
+        $body = wp_remote_retrieve_body($coffee_response);
+        $data = json_decode($body, true);
+        $coffee_url = $data['file'] ?? '';
+    }
+
+    // Fetch 5 Kanye Quotes
+    $quotes = [];
+    for ($i = 0; $i < 5; $i++) {
+        $quote_response = wp_remote_get('https://api.kanye.rest/');
+        if (!is_wp_error($quote_response)) {
+            $body = wp_remote_retrieve_body($quote_response);
+            $quote = json_decode($body, true)['quote'] ?? '';
+            if ($quote) {
+                $quotes[] = $quote;
+            }
+        }
+    }
+
+    // Generate HTML Output
+    ob_start();
+    ?>
+    <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+        <?php if ($coffee_url): ?>
+            <img src="<?php echo esc_url($coffee_url); ?>" alt="Coffee Image" style="width:100%; border-radius: 10px; margin-bottom: 20px;">
+        <?php endif; ?>
+
+        <ol style="list-style-type: disc; padding-left: 20px; text-align: left;">
+            <?php foreach ($quotes as $quote): ?>
+                <li><?php echo esc_html($quote); ?></li>
+            <?php endforeach; ?>
+        </ol>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+// ✅ Register Shortcode to Use in Pages
+add_shortcode('coffee_quotes', 'hs_get_coffee_and_quotes');
